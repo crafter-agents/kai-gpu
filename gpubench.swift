@@ -88,3 +88,66 @@ for i in 1...6 {
 }
 let bestGflops = totalFlops / best / 1e9
 print(String(format: "\nBEST: %.1f GFLOPS (%.2f TFLOPS) fp32", bestGflops, bestGflops/1000))
+
+let INNER2 = 512
+let src2 = """
+#include <metal_stdlib>
+using namespace metal;
+kernel void simdmm(device float* out [[buffer(0)]],
+                   constant uint& inner [[buffer(1)]],
+                   uint tgid [[threadgroup_position_in_grid]],
+                   uint tid [[thread_position_in_threadgroup]]) {
+    simdgroup_float8x8 base = simdgroup_float8x8(1.0001);
+    simdgroup_float8x8 mulA = simdgroup_float8x8(1.0000001);
+    simdgroup_float8x8 mulB = simdgroup_float8x8(0.9999999);
+    simdgroup_float8x8 acc0 = base, acc1 = base, acc2 = base, acc3 = base;
+    for (uint i = 0; i < inner; i++) {
+        simdgroup_multiply_accumulate(acc0, acc0, mulA, acc0);
+        simdgroup_multiply_accumulate(acc1, acc1, mulB, acc1);
+        simdgroup_multiply_accumulate(acc2, acc2, mulA, acc2);
+        simdgroup_multiply_accumulate(acc3, acc3, mulB, acc3);
+    }
+    if (tid == 0) {
+        threadgroup float tmp[64];
+        simdgroup_store(acc0, tmp, 8);
+        out[tgid] = tmp[0] + tmp[1];
+    }
+}
+"""
+let lib2 = try dev.makeLibrary(source: src2, options: nil)
+let fn2 = lib2.makeFunction(name: "simdmm")!
+let pipe2 = try dev.makeComputePipelineState(function: fn2)
+
+let numGroups2 = 1 << 15  // 32768 simdgroups, one 32-thread threadgroup each
+let outBuf2 = dev.makeBuffer(length: numGroups2 * 4, options: .storageModeShared)!
+var inner2 = UInt32(INNER2)
+let innerBuf2 = dev.makeBuffer(bytes: &inner2, length: 4, options: .storageModeShared)!
+
+// FLOPs: each simdgroup_multiply_accumulate on 8x8x8 = 2*8*8*8 = 1024 FLOPs.
+// 4 independent accumulators * INNER2 iterations * numGroups2 threadgroups.
+let totalFlops2 = Double(numGroups2) * Double(INNER2) * 4.0 * 1024.0
+
+func runOnce2() -> Double {
+    let cb = q.makeCommandBuffer()!
+    let enc = cb.makeComputeCommandEncoder()!
+    enc.setComputePipelineState(pipe2)
+    enc.setBuffer(outBuf2, offset: 0, index: 0)
+    enc.setBuffer(innerBuf2, offset: 0, index: 1)
+    enc.dispatchThreadgroups(MTLSize(width: numGroups2, height: 1, depth: 1),
+                             threadsPerThreadgroup: MTLSize(width: 32, height: 1, depth: 1))
+    enc.endEncoding()
+    cb.commit()
+    cb.waitUntilCompleted()
+    return cb.gpuEndTime - cb.gpuStartTime
+}
+
+print("\n=== simdgroup_matrix benchmark (\(numGroups2) simdgroups, \(INNER2) mma x4 each) ===")
+var best2 = Double.greatestFiniteMagnitude
+for i in 1...6 {
+    let t = runOnce2()
+    let gflops = totalFlops2 / t / 1e9
+    print(String(format: "run %d: %.3f ms  -> %.1f GFLOPS", i, t*1000, gflops))
+    best2 = min(best2, t)
+}
+let bestGflops2 = totalFlops2 / best2 / 1e9
+print(String(format: "\nBEST: %.1f GFLOPS (%.2f TFLOPS) fp32 simdgroup_matrix", bestGflops2, bestGflops2/1000))
