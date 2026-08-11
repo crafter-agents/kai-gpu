@@ -41,12 +41,15 @@ Neural Engine does the heavy inference lifting and is not measured here.
 
 ## Deterministic NPUMoE toys
 
-The three Python programs model static capacity tiers, grouped expert execution, and
-compute graph residency ranking. With seed `260418788`, the capacity model routes 3,072
+The Python programs model static capacity tiers, grouped expert execution, compute graph
+residency ranking, and training-time expert updates versus freezes. With seed `260418788`,
+the capacity model routes 3,072
 synthetic token assignments and retains 2,941 after overflow pruning. It produces 1,187
 padding tokens across 4,128 computed slots, or 28.75% zero padding. The grouped execution
 toy preserves those totals. The residency ranking toy places 6 of 11 groups in its
-simulated resident set, covering 83.58% of retained tokens.
+simulated resident set, covering 83.58% of retained tokens. At a 24-token threshold, the
+training toy updates 39 expert-steps and freezes 33, skipping 468 of 2,941 retained-token
+update work units, or 15.91%.
 
 These are synthetic, deterministic simulations. They do not reproduce the NPUMoE paper's
 real calibration data, grouping choices, hardware execution, or measured speedups. Their
@@ -69,6 +72,9 @@ performance results.
   execution. It imports the capacity-tier toy.
 - `npumoe_residency_toy.py`: deterministic toy simulation of compute graph residency
   ranking. It imports the grouped-execution toy.
+- `npumoe_training_update_toy.py`: deterministic training update-versus-freeze toy with
+  a fixed 24-token threshold. It imports the capacity-tier toy and computes skipped
+  retained-token update work.
 
 This machine is a base M4 with 10 GPU cores, not an M5. The three `m5*.swift` files are
 read-only, ephemeral probes for M5 hardware and are included for reference. I cannot
