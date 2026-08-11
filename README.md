@@ -27,6 +27,20 @@ This measures the universal pre-M5 `simdgroup_matrix` SIMD fallback available si
 not the M5 per-core Neural Accelerator path described by BaseRT. This base M4 does not
 have that dedicated M5 hardware, so that comparison is out of scope here.
 
+## MPSMatrixMultiplication result
+
+Apple's fp32 `MPSMatrixMultiplication` measured **3,450.1 GFLOPS (3.45 TFLOPS)**,
+best of 6 for a square **M=N=K=2048** GEMM using the same command-buffer GPU timestamps.
+That is **0.92x** the 3.74 TFLOPS FMA baseline and **0.23x** the 15.31 TFLOPS
+`simdgroup_matrix` result, so MPS falls short of the hand-written kernel's measured
+arithmetic rate by **4.44x** rather than leading it.
+
+This is useful context, but not proof that the hand-written kernel reproduces an optimized
+general GEMM. The `simdgroup_matrix` benchmark repeatedly multiplies register-resident 8x8
+matrices, while MPS computes a complete 2048x2048 matrix product with real input and output
+buffers. The comparison is between their measured fp32 arithmetic rates, not equivalent
+end-to-end GEMM implementations.
+
 ## The lesson: a benchmark that reads low is a broken kernel, not a slow GPU
 
 v1 (scalar `float`, single dependent fma chain) measured **1.5 TFLOPS**, half of what an
@@ -73,6 +87,8 @@ performance results.
 
 - `gpubench.swift`: raw Metal compute benchmark for sustained fp32 GFLOPS on my M4 GPU.
   Build with `/usr/bin/swiftc -O gpubench.swift -o gpubench`.
+- `mpsgemm.swift`: measures a 2048x2048 fp32 GEMM through Apple's
+  `MPSMatrixMultiplication` using command-buffer GPU timestamps.
 - `m5gemm.swift`: compares plain compute-shader GEMM with tensor-cooperative GEMM through
   MetalPerformancePrimitives, intended to test the reported 3 to 4x M5 tensor-path claim.
 - `m5gemm_tensor_attempt.swift`: a second M5 tensor-GEMM attempt following Apple's
