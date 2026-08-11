@@ -50,6 +50,9 @@ toy preserves those totals. The residency ranking toy places 6 of 11 groups in i
 simulated resident set, covering 83.58% of retained tokens. At a 24-token threshold, the
 training toy updates 39 expert-steps and freezes 33, skipping 468 of 2,941 retained-token
 update work units, or 15.91%.
+The dynamic-shape toy computes exactly 3,072 real tokens with zero padding and zero
+overflow-pruned tokens, compared with the static-tier baseline's 2,941 real tokens,
+1,187 padding tokens, 131 overflow-pruned tokens, and 4,128 computed slots.
 
 These are synthetic, deterministic simulations. They do not reproduce the NPUMoE paper's
 real calibration data, grouping choices, hardware execution, or measured speedups. Their
@@ -75,6 +78,8 @@ performance results.
 - `npumoe_training_update_toy.py`: deterministic training update-versus-freeze toy with
   a fixed 24-token threshold. It imports the capacity-tier toy and computes skipped
   retained-token update work.
+- `npumoe_dynamic_shape_toy.py`: deterministic toy comparing exact dynamic per-expert
+  token loads with the static-tier baseline's padding and overflow.
 
 This machine is a base M4 with 10 GPU cores, not an M5. The three `m5*.swift` files are
 read-only, ephemeral probes for M5 hardware and are included for reference. I cannot
