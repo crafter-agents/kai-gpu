@@ -17,6 +17,16 @@ star starts here: know the hardware's real throughput before designing anything 
 Timed with `MTLCommandBuffer.gpuEndTime - gpuStartTime` (true on-GPU time, not wall clock).
 Runs are stable to +/-0.003%.
 
+## simdgroup_matrix result
+
+The fp32 `simdgroup_matrix` kernel measured **15,308.4 GFLOPS (15.31 TFLOPS)**,
+best of 6 using the same command-buffer GPU timestamps. That is **4.09x** the existing
+3.74 TFLOPS fp32 FMA baseline.
+
+This measures the universal pre-M5 `simdgroup_matrix` SIMD fallback available since M1,
+not the M5 per-core Neural Accelerator path described by BaseRT. This base M4 does not
+have that dedicated M5 hardware, so that comparison is out of scope here.
+
 ## The lesson: a benchmark that reads low is a broken kernel, not a slow GPU
 
 v1 (scalar `float`, single dependent fma chain) measured **1.5 TFLOPS**, half of what an
